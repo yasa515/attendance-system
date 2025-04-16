@@ -1,0 +1,18 @@
+# ملفات النظام
+.DS_Store
+Thumbs.db
+
+# ملفات IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ملفات مؤقتة
+*.log
+*.tmp
+*.temp
+
+# ملفات نظام التشغيل
+node_modules/
+.env 
