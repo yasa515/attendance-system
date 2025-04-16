@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>abofhd515</title>
+    <style>
+        @media print {
+            body > *:not(.print-only) {
+                display: none !important;
+            }
+            body {
+                background-color: white;
+                color: black;
+                padding: 0;
+                margin: 0;
+            }
+            .print-only {
+                display: block !important;
+                width: 100%;
+                max-width: none;
+                margin: 0;
+                padding: 20px;
+            }
+            .print-header {
+                text-align: center;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+            }
+            .print-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+                page-break-inside: avoid;
+            }
+            .print-table th, .print-table td {
+                border: 1px solid #000;
+                padding: 8px;
+                text-align: right;
+            }
+            .print-table th {
+                background-color: #f0f0f0;
+            }
+            .print-summary {
+                margin-top: 20px;
+                padding: 10px;
+                border: 1px solid #000;
+                page-break-inside: avoid;
+            }
+            .print-summary p {
+                margin: 5px 0;
+                font-size: 16px;
+            }
+            .section-title {
+                font-size: 18px;
+                font-weight: bold;
+                margin: 20px 0 10px 0;
+                text-align: right;
+                border-bottom: 1px solid #000;
+                padding-bottom: 5px;
+            }
+        }
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: 'Segoe UI', sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        input, select, textarea, button {
+            background-color: #1e1e1e;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        table {
+            width: 100%;
+            max-width: 600px;
+            margin: auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 8px;
+        }
+        .حاضر { background-color: #003300; }
+        .غائب { background-color: #330000; }
+        .فرق { background-color: #002244; }
+        .انسحاب { background-color: #333333; }
+        .print-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+        }
+        .print-only {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>💼 abofhd515</h1>
+
+    <textarea id="namesInput" placeholder="ألصق هنا الأسماء، اسم في كل سطر" rows="6" style="width:90%; max-width:500px;"></textarea><br>
+    <button onclick="generateNames()">🗌 تجهيز الأسماء</button>
+
+    <div id="namesTable"></div>
+    <div id="nameSummary" style="margin-top: 10px; font-size: 18px;"></div><br><div id="summaryTable" style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;"></div>
+
+    <input type="text" id="date" placeholder="اكتب التاريخ">
+    <select id="period">
+        <option value="">اختر الفترة</option>
+        <option value="صباحي">صباحي</option>
+        <option value="مسائي">مسائي</option>
+    </select><br>
+
+    <input type="number" id="ghayr_nazel" placeholder="غير النازل (مسبق)">
+    <input type="number" id="ghiyab" placeholder="الغياب" readonly>
+    <input type="number" id="withdrawal" placeholder="الانسحاب" readonly><br>
+
+    <button onclick="calculate()">✨ احسب</button>
+    <button onclick="resetData()">🗑️ إعادة تعيين</button>
+    <button onclick="window.print()" class="print-btn">🖨️ طباعة</button>
+
+    <div class="result" id="results"></div>
+    <div class="success-message" id="fr-message"></div>
+
+    <div id="print-content" class="print-only">
+        <div class="print-header">
+            <h2>تقرير الحضور والغياب</h2>
+            <p id="print-date"></p>
+            <p id="print-period"></p>
+        </div>
+        
+        <div id="print-ghiyab"></div>
+        <div id="print-fareq"></div>
+        <div id="print-withdrawal"></div>
+        
+        <div id="print-results" class="print-summary"></div>
+    </div>
+
+    <script>
+        function generateNames() {
+            localStorage.setItem('namesInput', document.getElementById('namesInput').value);
+            const rawNames = document.getElementById('namesInput').value.trim().split('\n');
+            let html = '<table><tr><th>الاسم</th><th>الحالة</th><th>ملاحظة</th></tr>';
+            rawNames.forEach((name, index) => {
+                if (name.trim()) {
+                    html += `<tr class="row">
+                        <td>${index + 1}- ${name.trim()}</td>
+                        <td>
+                            <select class="status-select" onchange="syncCounts(); saveState();">
+                                <option value="حاضر">حاضر</option>
+                                <option value="غائب">غائب</option>
+                                <option value="فرق">فرق</option>
+                                <option value="انسحاب">انسحاب</option>
+                            </select>
+                        </td>
+                        <td><input type='text' class='fareq-note' oninput="saveState();" placeholder='أدخل الملاحظة'></td>
+                    </tr>`;
+                }
+            });
+            html += '</table>';
+            document.getElementById('namesTable').innerHTML = html;
+            syncCounts();
+        }
+
+        function syncCounts() {
+            const selects = document.querySelectorAll('.status-select');
+            let hadir = 0, ghiyab = 0, fareq = 0, withdrawal = 0;
+            selects.forEach(sel => {
+                const val = sel.value;
+                const row = sel.closest('tr');
+                row.className = val;
+                if (val === "حاضر") hadir++;
+                else if (val === "غائب") ghiyab++;
+                else if (val === "فرق") fareq++;
+                else if (val === "انسحاب") withdrawal++;
+            });
+            document.getElementById("nameSummary").innerText =
+                `عدد الحاضرين: ${hadir} | عدد الغياب: ${ghiyab} | عدد الفرق: ${fareq} | عدد الانسحاب: ${withdrawal}`;
+            document.getElementById("ghiyab").value = ghiyab;
+            document.getElementById("withdrawal").value = withdrawal;
+        }
+
+        function saveState() {
+            localStorage.setItem('namesInput', document.getElementById('namesInput').value);
+            const statuses = Array.from(document.querySelectorAll('.status-select')).map(s => s.value);
+            const notes = Array.from(document.querySelectorAll('.fareq-note')).map(n => n.value);
+            localStorage.setItem('statuses', JSON.stringify(statuses));
+            localStorage.setItem('notes', JSON.stringify(notes));
+        }
+
+        function calculate() {
+            localStorage.setItem('ghayr_nazel', document.getElementById('ghayr_nazel').value);
+            localStorage.setItem('date', document.getElementById('date').value);
+            localStorage.setItem('period', document.getElementById('period').value);
+            const rows = Array.from(document.querySelectorAll('#namesTable table tr')).slice(1);
+            rows.sort((a, b) => {
+                const order = ['غائب', 'انسحاب', 'فرق', 'حاضر'];
+                const aVal = a.children[1].querySelector('select').value;
+                const bVal = b.children[1].querySelector('select').value;
+                return order.indexOf(aVal) - order.indexOf(bVal);
+            });
+            const table = document.querySelector('#namesTable table');
+            rows.forEach((r, i) => {
+                const nameCell = r.children[0];
+                const originalName = nameCell.textContent.split('- ')[1];
+                nameCell.textContent = `${i + 1}- ${originalName}`;
+                table.appendChild(r);
+            });
+
+            let hadir = 0, fareq = 0, ghiyab = 0, withdrawal = 0;
+            const selects = document.querySelectorAll('.status-select');
+            selects.forEach(sel => {
+                if (sel.value === "حاضر") hadir++;
+                else if (sel.value === "فرق") fareq++;
+                else if (sel.value === "غائب") ghiyab++;
+                else if (sel.value === "انسحاب") withdrawal++;
+            });
+
+            const totalNames = selects.length;
+            const nazel = totalNames - ghiyab - withdrawal;
+            const nazelAfterGhiyab = nazel;
+            const ghayrNazel = parseInt(document.getElementById('ghayr_nazel').value) || 0;
+            const ghayrNazelAfter = ghayrNazel + ghiyab + withdrawal;
+            const alFi3ly = nazel - fareq;
+            const alMalak = nazel + ghayrNazelAfter;
+
+            const dateText = document.getElementById('date').value || '-';
+            const periodText = document.getElementById('period').value || '-';
+            const summaryTable = document.getElementById("summaryTable");
+            const filteredRows = rows.filter(row => {
+                const status = row.children[1].querySelector('select').value;
+                return status !== 'حاضر';
+            });
+            let summaryHTML = '<table><tr><th>الاسم</th><th>الحالة</th><th>الملاحظة</th></tr>';
+            filteredRows.forEach(r => {
+                const name = r.children[0].innerText;
+                const status = r.children[1].querySelector('select').value;
+                const task = r.children[2].querySelector('input').value;
+                summaryHTML += `<tr><td>${name}</td><td>${status}</td><td>${task}</td></tr>`;
+            });
+            summaryHTML += '</table>';
+            summaryTable.innerHTML = summaryHTML;
+
+            document.getElementById("results").innerHTML = `
+                التاريخ: ${dateText} <br>
+                الفترة: ${periodText} <br><br>
+                الفرق الكلي: ${fareq}<br>
+                النازل بعد الغياب: ${nazelAfterGhiyab}<br>
+                غير النازل بعد الغياب: ${ghayrNazelAfter}<br>
+                الفعلي: ${alFi3ly}<br>
+                الملاك: ${alMalak}`;
+
+            document.getElementById("fr-message").innerText = nazelAfterGhiyab > 0 ? "فرررررر" : "";
+
+            // تحديث محتوى الطباعة
+            document.getElementById('print-date').textContent = `التاريخ: ${dateText}`;
+            document.getElementById('print-period').textContent = `الفترة: ${periodText}`;
+
+            // تصنيف الأسماء حسب الحالة
+            const ghiyabRows = filteredRows.filter(r => r.children[1].querySelector('select').value === 'غائب');
+            const fareqRows = filteredRows.filter(r => r.children[1].querySelector('select').value === 'فرق');
+            const withdrawalRows = filteredRows.filter(r => r.children[1].querySelector('select').value === 'انسحاب');
+
+            // إنشاء جدول الغياب
+            let ghiyabHTML = '<div class="section-title">قائمة الغياب</div>';
+            if (ghiyabRows.length > 0) {
+                ghiyabHTML += '<table class="print-table"><tr><th>الاسم</th><th>ملاحظة</th></tr>';
+                ghiyabRows.forEach(r => {
+                    const name = r.children[0].innerText;
+                    const task = r.children[2].querySelector('input').value;
+                    ghiyabHTML += `<tr><td>${name}</td><td>${task}</td></tr>`;
+                });
+                ghiyabHTML += '</table>';
+            } else {
+                ghiyabHTML += '<p>لا يوجد غياب</p>';
+            }
+            document.getElementById('print-ghiyab').innerHTML = ghiyabHTML;
+
+            // إنشاء جدول الفرق
+            let fareqHTML = '<div class="section-title">قائمة الفرق</div>';
+            if (fareqRows.length > 0) {
+                fareqHTML += '<table class="print-table"><tr><th>الاسم</th><th>ملاحظة</th></tr>';
+                fareqRows.forEach(r => {
+                    const name = r.children[0].innerText;
+                    const task = r.children[2].querySelector('input').value;
+                    fareqHTML += `<tr><td>${name}</td><td>${task}</td></tr>`;
+                });
+                fareqHTML += '</table>';
+            } else {
+                fareqHTML += '<p>لا يوجد فرق</p>';
+            }
+            document.getElementById('print-fareq').innerHTML = fareqHTML;
+
+            // إنشاء جدول الانسحاب
+            let withdrawalHTML = '<div class="section-title">قائمة الانسحاب</div>';
+            if (withdrawalRows.length > 0) {
+                withdrawalHTML += '<table class="print-table"><tr><th>الاسم</th><th>ملاحظة</th></tr>';
+                withdrawalRows.forEach(r => {
+                    const name = r.children[0].innerText;
+                    const task = r.children[2].querySelector('input').value;
+                    withdrawalHTML += `<tr><td>${name}</td><td>${task}</td></tr>`;
+                });
+                withdrawalHTML += '</table>';
+            } else {
+                withdrawalHTML += '<p>لا يوجد انسحاب</p>';
+            }
+            document.getElementById('print-withdrawal').innerHTML = withdrawalHTML;
+
+            // تحديث النتائج
+            document.getElementById('print-results').innerHTML = `
+                <p>الفرق الكلي: ${fareq}</p>
+                <p>النازل بعد الغياب: ${nazelAfterGhiyab}</p>
+                <p>غير النازل بعد الغياب: ${ghayrNazelAfter}</p>
+                <p>الفعلي: ${alFi3ly}</p>
+                <p>الملاك: ${alMalak}</p>`;
+        }
+
+        function resetData() {
+            if (confirm("هل أنت متأكد أنك تريد حذف جميع البيانات؟ لا يمكن التراجع عن هذا.")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        window.onload = function () {
+            const namesInput = localStorage.getItem('namesInput');
+            const statuses = JSON.parse(localStorage.getItem('statuses') || '[]');
+            const notes = JSON.parse(localStorage.getItem('notes') || '[]');
+            if (namesInput) {
+                document.getElementById('namesInput').value = namesInput;
+                generateNames();
+                const selects = document.querySelectorAll('.status-select');
+                const inputs = document.querySelectorAll('.fareq-note');
+                selects.forEach((s, i) => s.value = statuses[i] || "حاضر");
+                inputs.forEach((n, i) => n.value = notes[i] || "");
+                syncCounts();
+            }
+            document.getElementById('ghayr_nazel').value = localStorage.getItem('ghayr_nazel') || "";
+            document.getElementById('date').value = localStorage.getItem('date') || "";
+            document.getElementById('period').value = localStorage.getItem('period') || "";
+        }
+    </script>
+</body>
+</html> 
